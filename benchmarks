@@ -1,0 +1,49 @@
+Benchmarks were obtained using the following processor, compilers and
+test cases. Timings are given in mm:ss
+
+Processor: Intel(R) Xeon(R) CPU E5-2670 0 @ 2.60GHz
+Gnu compiler:  g++ version 4.8.1
+Intel comiler: icpc version 13.0.1
+PGI compiler:  pgCC version13.2-0
+
+# Benchmark 1
+src/lda -est -alpha 0.5 -beta 0.1 -ntopics 100 -niters 1000 \
+-savestep 100 -twords 20 -dfile models/casestudy/trndocs.dat
+
+# Benchmark 2
+src/lda -estc -dir models/casestudy/ -model model-01000 -niters 800 \
+-savestep 100 -twords 30
+
+# Benchmark 3
+src/lda -inf -dir models/casestudy/ -model model-01800 -niters 30 \
+-twords 20 -dfile newdocs.dat
+
+------------ GibbsLDA+_ 0.3 ------------
+Compiler  opt level  time_1  time_2  time_3
+--------  ---------  ------  ------  ------
+g++       default     5:17    4:51    0:02
+pgCC      default     2:19    1:34    0:01
+icpc      default     3:37    2:50    0:02
+g++         -O3       1:50    1:26    0:01
+icpc        -O3       1:57    1:34    0:01
+pgCC        -O3       2:03    1:37    0:01
+
+Identical results are obtained for all compiler and optimization
+levels. Note that aggressive (-O3) optimization results in
+significantly improved run times.
+
+****** Comparison with earlier versions ******
+
+Version 0.3 of GibbsLDA++ is approximately four times faster than the
+previously released version (0.2) and yields identical results.
+
+------------ GibbsLDA+_ 0.2 ------------
+Compiler  opt level  time_1  time_2  time_3
+--------  ---------  ------  ------  ------
+g++       default    12:08   10:04    0:03
+pgCC      default     8:41    6:46    0:02
+icpc      default     8:48    7:02    0:03
+g++         -O3       9:15    7:31    0:02
+icpc        -O3       8:46    7:02    0:03
+pgCC        -O3       8:26    6:45    0:02
+
