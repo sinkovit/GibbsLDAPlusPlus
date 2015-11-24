@@ -4,13 +4,17 @@
        A C/C++ Implementation of Latent Dirichlet Allocation (LDA) 
        using Gibbs Sampling for Parameter Estimation and Inference
 
-                   http://gibbslda.sourceforge.net/
-
                          Copyright (C) 2007 by
                             Xuan-Hieu Phan
             hieuxuan@ecei.tohoku.ac.jp or pxhieu@gmail.com
                 Graduate School of Information Sciences
                           Tohoku University
+
+                Performance optimizations implemented by
+                          Robert Sinkovits 
+                          sinkovit@sdsc.edu
+                     San Diego Supercomputer Center
+                  University of California, San Diego
 
 ****************************************************************************
 
@@ -99,6 +103,10 @@
 
   You can find and download document, source code, and case studies of 
   GibbsLDA++ at:
+
+  https://github.com/sinkovit/GibbsLDAPlusPlus
+
+  Previous releases available at:
 
   http://gibbslda.sourceforge.net/
   http://sourceforge.net/projects/gibbslda
