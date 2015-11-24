@@ -630,7 +630,7 @@ int model::init_est() {
 	ndsum[m] = 0;
     }
 
-    srandom(1234); // initialize for random number generation
+    srandom(1234); // Initialize random number generator
     z = new int*[M];
     for (m = 0; m < ptrndata->M; m++) {
 	int N = ptrndata->docs[m]->length;
@@ -743,17 +743,31 @@ void model::estimate() {
 
     printf("Sampling %d iterations!\n", niters);
 
+    // Precalculation of loop invariants
+    double Vbeta = V * beta;
+    double Kalpha = K * alpha;
+
+    // Allocate space for array of precomputed results
+    double *f1;
+    f1 = (double *) malloc(sizeof(double) * K);
+
     int last_iter = liter;
     for (liter = last_iter + 1; liter <= niters + last_iter; liter++) {
 	printf("Iteration %d ...\n", liter);
 	
 	// for all z_i
 	for (int m = 0; m < M; m++) {
+
+            // Precompute results to be used in model::sampling
+	    for (int k = 0; k < K; k++) {
+	      f1[k] = (nd[m][k] + alpha) / ((nwsum[k] + Vbeta)*(ndsum[m] - 1.0 + Kalpha));
+	    }
+
 	    for (int n = 0; n < ptrndata->docs[m]->length; n++) {
-		// (z_i = z[m][n])
-		// sample from p(z_i|z_-i, w)
-		int topic = sampling(m, n);
-		z[m][n] = topic;
+	      // (z_i = z[m][n])
+	      // sample from p(z_i|z_-i, w)
+	      int topic = sampling(m, n, f1);
+	      z[m][n] = topic;
 	    }
 	}
 	
@@ -774,43 +788,59 @@ void model::estimate() {
     compute_phi();
     liter--;
     save_model(utils::generate_model_name(-1));
+    free(f1);
 }
 
-int model::sampling(int m, int n) {
+int model::sampling(int m, int n, double *f1) {
     // remove z_i from the count variables
     int topic = z[m][n];
     int w = ptrndata->docs[m]->words[n];
     nw[w][topic] -= 1;
     nd[m][topic] -= 1;
     nwsum[topic] -= 1;
-    ndsum[m] -= 1;
 
     double Vbeta = V * beta;
     double Kalpha = K * alpha;    
+
+    // Update only element [topic] of array f1
+    f1[topic] = (nd[m][topic] + alpha) / ((nwsum[topic] + Vbeta)*(ndsum[m] - 1.0 + Kalpha));
+
     // do multinomial sampling via cumulative method
     for (int k = 0; k < K; k++) {
-	p[k] = (nw[w][k] + beta) / (nwsum[k] + Vbeta) *
-		    (nd[m][k] + alpha) / (ndsum[m] + Kalpha);
+      // Use precomputed array f1 to avoid unnecessary calculations
+        p[k] = (nw[w][k] + beta) * f1[k];
     }
     // cumulate multinomial parameters
-    for (int k = 1; k < K; k++) {
-	p[k] += p[k - 1];
+
+    // Calculate sum over array p and use for scaling
+    double sum=0.0;
+    for (int k = 0; k < K; k++) {
+      sum += p[k];
     }
     // scaled sample because of unnormalized p[]
-    double u = ((double)random() / RAND_MAX) * p[K - 1];
+
+    double u = ((double)random() / RAND_MAX) * sum;
     
-    for (topic = 0; topic < K; topic++) {
-	if (p[topic] > u) {
-	    break;
-	}
+    // Calculate multinomial coefficients as needed
+    if(p[0] > u) {
+      topic = 0;
+    } else {
+      for (topic = 1; topic < K; topic++) {
+        p[topic] += p[topic-1];
+        if (p[topic] > u) {
+          break;
+        }
+      }
     }
-    
+
     // add newly estimated z_i to count variables
     nw[w][topic] += 1;
     nd[m][topic] += 1;
     nwsum[topic] += 1;
-    ndsum[m] += 1;    
-    
+
+    // Recover original value of element [topic] of array f1
+    f1[topic] = (nd[m][topic] + alpha) / ((nwsum[topic] + Vbeta)*(ndsum[m] - 1.0 + Kalpha));
+
     return topic;
 }
 
@@ -930,7 +960,7 @@ int model::init_inf() {
 	newndsum[m] = 0;
     }
 
-    srandom(1234); // initialize for random number generation
+    srandom(1234);  // Initialize random number generator
     newz = new int*[newM];
     for (m = 0; m < pnewdata->M; m++) {
 	int N = pnewdata->docs[m]->length;
@@ -974,17 +1004,32 @@ void model::inference() {
     }
 
     printf("Sampling %d iterations for inference!\n", niters);
+
+    // Precalculation of loop invariants
+    double Vbeta = V * beta;
+    double Kalpha = K * alpha;
+
+    // Allocate space for array of precomputed results
+    double *f1;
+    f1 = (double *) malloc(sizeof(double) * K);
     
     for (inf_liter = 1; inf_liter <= niters; inf_liter++) {
 	printf("Iteration %d ...\n", inf_liter);
 	
 	// for all newz_i
 	for (int m = 0; m < newM; m++) {
+
+            // Precompute results to be used in model::inf_sampling
+	    for (int k = 0; k < K; k++) {
+	      f1[k] = (newnd[m][k] + alpha) /
+		((nwsum[k] + newnwsum[k] + Vbeta)*(newndsum[m] - 1.0 + Kalpha));
+	    }
+
 	    for (int n = 0; n < pnewdata->docs[m]->length; n++) {
-		// (newz_i = newz[m][n])
-		// sample from p(z_i|z_-i, w)
-		int topic = inf_sampling(m, n);
-		newz[m][n] = topic;
+	      // (newz_i = newz[m][n])
+	      // sample from p(z_i|z_-i, w)
+	      int topic = inf_sampling(m, n, f1);
+	      newz[m][n] = topic;
 	    }
 	}
     }
@@ -995,9 +1040,10 @@ void model::inference() {
     compute_newphi();
     inf_liter--;
     save_inf_model(dfile);
+    free(f1);
 }
 
-int model::inf_sampling(int m, int n) {
+int model::inf_sampling(int m, int n, double *f1) {
     // remove z_i from the count variables
     int topic = newz[m][n];
     int w = pnewdata->docs[m]->words[n];
@@ -1005,33 +1051,49 @@ int model::inf_sampling(int m, int n) {
     newnw[_w][topic] -= 1;
     newnd[m][topic] -= 1;
     newnwsum[topic] -= 1;
-    newndsum[m] -= 1;
     
     double Vbeta = V * beta;
     double Kalpha = K * alpha;
+
+    // Update only element [topic] of array f1
+    f1[topic] = (newnd[m][topic] + alpha) /
+      ((nwsum[topic] + newnwsum[topic] + Vbeta)*(newndsum[m] - 1.0 + Kalpha));
+
     // do multinomial sampling via cumulative method
     for (int k = 0; k < K; k++) {
-	p[k] = (nw[w][k] + newnw[_w][k] + beta) / (nwsum[k] + newnwsum[k] + Vbeta) *
-		    (newnd[m][k] + alpha) / (newndsum[m] + Kalpha);
+      // Use precomputed array f1 to avoid unnecessary calculations
+      p[k] = (nw[w][k] + newnw[_w][k] + beta) * f1[k];
     }
-    // cumulate multinomial parameters
-    for (int k = 1; k < K; k++) {
-	p[k] += p[k - 1];
+
+    // Calculate sum over array p and use for scaling
+    double sum=0.0;
+    for (int k = 0; k < K; k++) {
+      sum += p[k];
     }
     // scaled sample because of unnormalized p[]
-    double u = ((double)random() / RAND_MAX) * p[K - 1];
-    
-    for (topic = 0; topic < K; topic++) {
-	if (p[topic] > u) {
-	    break;
-	}
+
+    double u = ((double)random() / RAND_MAX) * sum;
+
+    // Calculate multinomial coefficients as needed
+    if(p[0] > u) {
+      topic = 0;
+    } else {
+      for (topic = 1; topic < K; topic++) {
+        p[topic] += p[topic-1];
+        if (p[topic] > u) {
+          break;
+        }
+      }
     }
-    
+
     // add newly estimated z_i to count variables
     newnw[_w][topic] += 1;
     newnd[m][topic] += 1;
     newnwsum[topic] += 1;
-    newndsum[m] += 1;    
+
+    // Recover original value of element [topic] of array f1
+    f1[topic] = (newnd[m][topic] + alpha) /
+      ((nwsum[topic] + newnwsum[topic] + Vbeta)*(newndsum[m] - 1.0 + Kalpha));
     
     return topic;
 }

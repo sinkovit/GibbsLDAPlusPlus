@@ -140,7 +140,7 @@ public:
 	
     // estimate LDA model using Gibbs sampling
     void estimate();
-    int sampling(int m, int n);
+    int sampling(int m, int n, double *f1);
     void compute_theta();
     void compute_phi();
     
@@ -148,7 +148,7 @@ public:
     int init_inf();
     // inference for new (unseen) data based on the estimated LDA model
     void inference();
-    int inf_sampling(int m, int n);
+    int inf_sampling(int m, int n, double *f1);
     void compute_newtheta();
     void compute_newphi();
 };
